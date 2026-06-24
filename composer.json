@@ -1,0 +1,30 @@
+{
+    "name": "leafling/laravel-shared-queue",
+    "description": "Utilitarian package for sharing queue databases and scoping background tasks across multiple Laravel applications and domains.",
+    "type": "library",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Leafling\\SharedQueue\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Trevor Borgmeier",
+            "email": "trevor@leafling.com"
+        }
+    ],
+    "require": {
+        "php": ">=8.3",
+        "illuminate/support": "^11.0|^12.0|^13.0",
+        "illuminate/database": "^11.0|^12.0|^13.0",
+        "illuminate/queue": "^11.0|^12.0|^13.0"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Leafling\\SharedQueue\\SharedQueueServiceProvider"
+            ]
+        }
+    }
+}
