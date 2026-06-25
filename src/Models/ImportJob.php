@@ -10,6 +10,11 @@ class ImportJob extends Model
 {
     protected $table = 'import_jobs';
 
+    public function getConnectionName()
+    {
+        return config('shared-queue.connection', parent::getConnectionName());
+    }
+
     protected $fillable = [
         'site_code',
         'type',
