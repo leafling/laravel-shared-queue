@@ -152,7 +152,7 @@ Embed the watcher Blade component in your views to show real-time progress of a 
 ```
 
 ### 4. Admin Dashboard Customization & Embedding
-You can access the built-in dashboard at `/admin/shared-queue/dashboard` (or whatever custom path you specified in config). 
+You can access the built-in dashboard at `/admin/shared-queue` (or whatever custom path you specified in config). 
 
 #### Publishing and Customizing Dashboard Views
 To customize or restyle the views, publish them to your local project:

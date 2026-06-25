@@ -51,7 +51,7 @@ class SharedQueueServiceProvider extends ServiceProvider
             ->prefix($path)
             ->name('shared-queue.')
             ->group(function () {
-                Route::get('/dashboard', [SharedQueueController::class, 'dashboard'])->name('dashboard');
+                Route::get('/', [SharedQueueController::class, 'dashboard'])->name('dashboard');
                 Route::get('/jobs/{job}/status', [SharedQueueController::class, 'status'])->name('status');
                 Route::post('/jobs/{job}/reset', [SharedQueueController::class, 'reset'])->name('reset');
             });

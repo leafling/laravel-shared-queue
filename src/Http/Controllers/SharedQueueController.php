@@ -23,6 +23,14 @@ class SharedQueueController extends Controller
      */
     public function status(ImportJob $job)
     {
+        if (in_array($job->status, ['completed', 'failed'])) {
+            if ($job->status === 'completed') {
+                session()->flash('message', $job->message);
+            } else {
+                session()->flash('error', $job->message);
+            }
+        }
+
         return response()->json([
             'id' => $job->id,
             'status' => $job->status,
