@@ -17,6 +17,9 @@ class JobTracker extends Model
 
     protected $fillable = [
         'site_code',
+        'initiated_by',
+        'user_id',
+        'user_type',
         'type',
         'status',
         'current_step',
@@ -32,6 +35,26 @@ class JobTracker extends Model
         'completed_at' => 'datetime',
         'step_details' => 'array',
     ];
+
+    /**
+     * Get the polymorphic user that initiated the job.
+     */
+    public function user(): \Illuminate\Database\Eloquent\Relations\MorphTo
+    {
+        return $this->morphTo();
+    }
+
+    /**
+     * Safely resolve the morph relation class only if it exists in the active codebase.
+     */
+    public function getInitiatorRelationAttribute()
+    {
+        if ($this->user_type && class_exists($this->user_type)) {
+            return $this->user;
+        }
+
+        return null;
+    }
 
     public static function resolveSiteCode(): string
     {
@@ -59,9 +82,29 @@ class JobTracker extends Model
 
     protected static function booted(): void
     {
-        // Auto-populate site_code on create
+        // Auto-populate site_code and initiator on create
         static::creating(function (self $model): void {
             $model->site_code = $model->site_code ?? static::resolveSiteCode();
+
+            // Dynamic session initiator resolving
+            if (!app()->runningInConsole() && !$model->initiated_by) {
+                $user = null;
+                foreach (['admin', 'web'] as $guard) {
+                    if (auth($guard)->check()) {
+                        $user = auth($guard)->user();
+                        break;
+                    }
+                }
+
+                if ($user) {
+                    $model->initiated_by = class_basename($user) . ' #' . $user->getKey() . 
+                                           ($user->name ? " ({$user->name})" : '');
+                    $model->user_id = $user->getKey();
+                    $model->user_type = get_class($user);
+                } else {
+                    $model->initiated_by = 'Guest';
+                }
+            }
         });
 
         // Auto-scope all queries to the active site_code

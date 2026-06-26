@@ -12,6 +12,9 @@ return new class extends Migration
         Schema::create('jobs_tracker', function (Blueprint $table) {
             $table->id();
             $table->string('site_code')->nullable()->index();
+            $table->string('initiated_by')->nullable();
+            $table->unsignedBigInteger('user_id')->nullable();
+            $table->string('user_type')->nullable();
             $table->string('type')->default('default');
             $table->string('status')->default('pending');
             $table->unsignedInteger('current_step')->default(0);

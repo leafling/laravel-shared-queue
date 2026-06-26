@@ -183,6 +183,25 @@ To query import jobs across all sites bypassing the dynamic global scope, use st
 $allJobs = JobTracker::withoutGlobalScope('site')->get();
 ```
 
+### 6. Initiator & User Tracking
+The package automatically tracks who initiated a job inside the `initiated_by` (static text string), `user_id` (integer), and `user_type` (polymorphic class string) database columns upon job creation in web request contexts.
+
+#### Displaying plain text initiator (Safe cross-site)
+Display the initiator's name/ID directly on your layouts:
+```html
+<p>Initiated By: {{ $job->initiated_by }}</p> 
+<!-- Outputs: "Admin #5 (Trevor Borgmeier)", "User #12", or "Guest" -->
+```
+
+#### Querying local User/Admin relationship (Dynamic morph)
+To fetch the actual model instance of the user, use the safe custom attribute `initiator_relation` (which avoids `ClassNotFoundException` crashes on sites that do not contain the initiator's model namespace):
+```php
+if ($userModel = $job->initiator_relation) {
+    // Safely interact with the local User or Admin model
+    $userEmail = $userModel->email;
+}
+```
+
 ---
 
 ## Production Worker (systemd) Setup
