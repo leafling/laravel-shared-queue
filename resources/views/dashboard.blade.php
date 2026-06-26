@@ -22,7 +22,7 @@
 </head>
 <body>
     <div class="card">
-        <h1>Shared Queue Jobs (Site: {{ \Leafling\SharedQueue\Models\ImportJob::resolveSiteCode() }})</h1>
+        <h1>Shared Queue Jobs (Site: {{ \Leafling\SharedQueue\Models\JobTracker::resolveSiteCode() }})</h1>
         @include('shared-queue::partials.jobs-table')
     </div>
 </body>

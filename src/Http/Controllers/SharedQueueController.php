@@ -4,24 +4,27 @@ namespace Leafling\SharedQueue\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Leafling\SharedQueue\Models\ImportJob;
+use Leafling\SharedQueue\Models\JobTracker;
+use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 
 class SharedQueueController extends Controller
 {
     /**
      * Display a dashboard listing all import jobs.
      */
-    public function dashboard()
+    public function dashboard(): View
     {
         // Display jobs, automatically filtered by the active site_code global scope
-        $jobs = ImportJob::latest()->paginate(25);
+        $jobs = JobTracker::latest()->paginate(25);
         return view('shared-queue::dashboard', compact('jobs'));
     }
 
     /**
      * Get the JSON status of a specific job.
      */
-    public function status(ImportJob $job)
+    public function status(JobTracker $job): JsonResponse
     {
         if (in_array($job->status, ['completed', 'failed'])) {
             if ($job->status === 'completed') {
@@ -45,7 +48,7 @@ class SharedQueueController extends Controller
     /**
      * Manually reset/force-fail a stuck active job.
      */
-    public function reset(ImportJob $job)
+    public function reset(JobTracker $job): RedirectResponse
     {
         if (in_array($job->status, ['pending', 'running'])) {
             $job->update([

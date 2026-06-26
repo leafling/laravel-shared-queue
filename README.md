@@ -6,7 +6,7 @@ This package provides utility features to safely share a single database queue a
 
 1. **Queue Isolation Helpers:** Best practices and configuration settings to segment workers using distinct queue names on a shared `jobs_queue` table (avoiding class serialization crashes).
 2. **Subdomain/Host Context Serialization:** A trait (`SerializesHostContext`) that automatically captures the active request scheme/domain/port when dispatching queue jobs and restores it inside the CLI background worker context.
-3. **Automated Site-Scoped Task Tracking:** An `ImportJob` Eloquent model and migration that automatically scopes and filters task status tracking by a dynamically resolved domain or manually specified `site_code` using global query scopes.
+3. **Automated Site-Scoped Task Tracking:** A `JobTracker` Eloquent model and migration that automatically scopes and filters task status tracking by a dynamically resolved domain or manually specified `site_code` using global query scopes.
 4. **Configurable Admin Dashboard:** A built-in dashboard listing site-scoped jobs with failure reset capabilities. Routes and path prefix are fully customizable or can be completely disabled.
 5. **Dynamic Progress Watcher:** A self-contained Blade component (`<x-shared-queue-watcher>`) that polls and renders live job progress updates using vanilla JavaScript.
 6. **Reusable Dashboard Partial:** A self-contained Blade view partial (`shared-queue::partials.jobs-table`) that can be embedded into any custom layout or page in your application.
@@ -39,7 +39,7 @@ composer update leafling/laravel-shared-queue
 ```
 
 ### 2. Run Database Migrations
-Run the package migrations to create the shared `import_jobs` table:
+Run the package migrations to create the shared `jobs_tracker` table:
 ```bash
 php artisan migrate
 ```
@@ -58,7 +58,7 @@ This creates `config/shared-queue.php` with the following configuration options:
 
 ```php
 return [
-    // Scopes all query/create operations on ImportJob.
+    // Scopes all query/create operations on JobTracker.
     // If null, it dynamically resolves via HTTP request host (e.g. competition.mnstatefair.org)
     // or the queue worker's restored URL host.
     'site_code' => env('SHARED_QUEUE_SITE_CODE', null),
@@ -120,13 +120,13 @@ class SendDynamicEmail implements ShouldQueue
 ```
 
 ### 2. Scoped Import Task Tracking
-Use the package's `ImportJob` model to track import progress. Operations are automatically scoped to the active domain (e.g. `competition.mnstatefair.org`):
+Use the package's `JobTracker` model to track import progress. Operations are automatically scoped to the active domain (e.g. `competition.mnstatefair.org`):
 
 ```php
-use Leafling\SharedQueue\Models\ImportJob;
+use Leafling\SharedQueue\Models\JobTracker;
 
 // 1. Create a tracking record (site_code is auto-populated to active request host)
-$tracker = ImportJob::create([
+$tracker = JobTracker::create([
     'type' => 'momentus-exhibitors',
     'status' => 'pending',
     'current_step' => 0,
@@ -134,7 +134,7 @@ $tracker = ImportJob::create([
 ]);
 
 // 2. Fetch active tracking jobs (Automatically scopes query by current host)
-$activeJob = ImportJob::active()->first();
+$activeJob = JobTracker::active()->first();
 
 // 3. Update job steps in background job handler
 $tracker->update([
@@ -180,7 +180,7 @@ To query import jobs across all sites bypassing the dynamic global scope, use st
 
 ```php
 // Retrieve all records regardless of site_code/domain
-$allJobs = ImportJob::withoutGlobalScope('site')->get();
+$allJobs = JobTracker::withoutGlobalScope('site')->get();
 ```
 
 ---

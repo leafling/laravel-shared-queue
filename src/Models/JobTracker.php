@@ -6,11 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 
-class ImportJob extends Model
+class JobTracker extends Model
 {
-    protected $table = 'import_jobs';
+    protected $table = 'jobs_tracker';
 
-    public function getConnectionName()
+    public function getConnectionName(): ?string
     {
         return config('shared-queue.connection', parent::getConnectionName());
     }
@@ -60,17 +60,17 @@ class ImportJob extends Model
     protected static function booted(): void
     {
         // Auto-populate site_code on create
-        static::creating(function ($model) {
+        static::creating(function (self $model): void {
             $model->site_code = $model->site_code ?? static::resolveSiteCode();
         });
 
         // Auto-scope all queries to the active site_code
-        static::addGlobalScope('site', function (Builder $builder) {
+        static::addGlobalScope('site', function (Builder $builder): void {
             $builder->where('site_code', static::resolveSiteCode());
         });
     }
 
-    public function scopeActive($query)
+    public function scopeActive(Builder $query): Builder
     {
         return $query->whereIn('status', ['pending', 'running'])
             ->where('updated_at', '>=', Carbon::now()->subMinutes(15));
