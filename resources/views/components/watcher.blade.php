@@ -1,4 +1,4 @@
-@props(['job' => null, 'steps' => null, 'trigger' => null, 'endpoint' => null])
+@props(['job' => null, 'steps' => null, 'trigger' => null, 'endpoint' => null, 'pollInterval' => 2000])
 
 @php
     $isFinished = $job && in_array($job->status, ['completed', 'failed']);
@@ -16,6 +16,14 @@
     $barColor = $job && $job->status === 'completed' ? '#22c55e' : ($job && $job->status === 'failed' ? '#ef4444' : '#3b82f6');
     $labelColor = $job && $job->status === 'completed' ? '#166534' : ($job && $job->status === 'failed' ? '#991b1b' : '#1f2937');
     $containerId = 'shared-queue-watcher-' . ($job->id ?? 'ajax-' . uniqid());
+
+    $rawMessage = $job->message ?? 'Initializing import job...';
+    $customRenderer = config('shared-queue.markdown_renderer');
+    if ($customRenderer && is_callable($customRenderer)) {
+        $renderedMessage = $customRenderer($rawMessage);
+    } else {
+        $renderedMessage = e($rawMessage);
+    }
 @endphp
 
 <div id="{{ $containerId }}" class="shared-queue-watcher-container" style="{{ $job ? 'display: block;' : 'display: none;' }} margin: 15px 0; padding: 15px; border: 1px solid #ddd; border-radius: 6px; background: #fafafa;">
@@ -28,7 +36,7 @@
     </div>
     
     <div class="progress-status-message" style="font-size: 0.875rem; color: #4b5563; margin-bottom: 12px;">
-        {!! \App\Helpers\Markdown::line($job->message ?? 'Initializing import job...') !!}
+        {!! $renderedMessage !!}
     </div>
 
     @if($steps)
@@ -71,6 +79,7 @@
             const triggerSelector = "{{ $trigger }}";
             const endpointUrl = "{{ $endpoint }}";
             
+            const pollIntervalMs = {{ (int) $pollInterval }};
             let activePollInterval = null;
 
             function parseMarkdown(str) {
@@ -173,7 +182,7 @@
                     } catch (e) {
                         console.error('Failed to poll shared queue job status:', e);
                     }
-                }, 2000);
+                }, pollIntervalMs);
             }
 
             // Bind trigger click if selector and endpoint are provided

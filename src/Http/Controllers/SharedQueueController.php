@@ -27,8 +27,8 @@ class SharedQueueController extends Controller
     {
         $job->refresh();
 
-        if (in_array($job->status, ['completed', 'failed'])) {
-            if ($job->status === 'completed') {
+        if (in_array($job->status, [JobTracker::STATUS_COMPLETED, JobTracker::STATUS_FAILED])) {
+            if ($job->status === JobTracker::STATUS_COMPLETED) {
                 session()->flash('message', $job->message);
             } else {
                 session()->flash('error', $job->message);
@@ -52,10 +52,15 @@ class SharedQueueController extends Controller
      */
     public function reset(JobTracker $job): RedirectResponse
     {
+        if ($gate = config('shared-queue.gate')) {
+            if (\Illuminate\Support\Facades\Gate::denies($gate, $job)) {
+                abort(403, 'Unauthorized action.');
+            }
+        }
 
-        if (in_array($job->status, ['pending', 'running'])) {
+        if (in_array($job->status, [JobTracker::STATUS_PENDING, JobTracker::STATUS_RUNNING])) {
             $job->update([
-                'status' => 'failed',
+                'status' => JobTracker::STATUS_FAILED,
                 'message' => 'Job was manually reset by an administrator.',
             ]);
             return redirect()->back()->with('message', 'Job status was reset successfully.');

@@ -8,7 +8,6 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::dropIfExists('import_jobs');
         Schema::create('jobs_tracker', function (Blueprint $table) {
             $table->id();
             $table->string('site_code')->nullable()->index();

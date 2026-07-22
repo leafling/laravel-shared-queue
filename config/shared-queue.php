@@ -45,6 +45,51 @@ return [
     */
     'middleware' => [
         'web',
-        // 'auth:admin',
+        'auth:admin',
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Auth Guards
+    |--------------------------------------------------------------------------
+    |
+    | Guards inspected sequentially to determine the initiator user when a
+    | job tracker record is created during a web request.
+    |
+    */
+    'auth_guards' => ['admin', 'web'],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Reset Authorization Gate
+    |--------------------------------------------------------------------------
+    |
+    | Optional Laravel Gate or policy permission string to check before resetting
+    | a job status (e.g. 'manage-shared-queue'). Set to null to rely solely on
+    | route middleware.
+    |
+    */
+    'gate' => null,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Fallback Site Code
+    |--------------------------------------------------------------------------
+    |
+    | Fallback site code used when SHARED_QUEUE_SITE_CODE is not set, running in
+    | CLI console, and app.url host is unavailable.
+    |
+    */
+    'fallback_site_code' => env('SHARED_QUEUE_SITE_CODE_FALLBACK', 'default'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Markdown Renderer Callback
+    |--------------------------------------------------------------------------
+    |
+    | Optional custom Markdown rendering callback or class method for status
+    | messages. If null, messages are safely HTML-escaped by default.
+    |
+    */
+    'markdown_renderer' => null,
 ];
