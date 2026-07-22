@@ -1,8 +1,8 @@
 @props([
-    'job' => null, 
-    'steps' => null, 
-    'trigger' => null, 
-    'endpoint' => null, 
+    'job' => null,
+    'steps' => null,
+    'trigger' => null,
+    'endpoint' => null,
     'pollInterval' => null,
     'pollMin' => null,
     'pollMax' => null,
@@ -17,24 +17,21 @@
     }
     $completedCount = count($stepDetails);
     $totalSteps = $job->total_steps ?? ($steps ? count($steps) : 1);
-    
+
     // Percentage is based on completed steps until the job is fully done
     $percent = $isFinished ? 100 : ($totalSteps > 0 ? min(95, max(5, round(($completedCount / $totalSteps) * 100))) : 5);
-    if (!$job) $percent = 0;
+    if (!$job) {
+        $percent = 0;
+    }
 
     $barColor = $job && $job->status === 'completed' ? '#22c55e' : ($job && $job->status === 'failed' ? '#ef4444' : '#3b82f6');
     $labelColor = $job && $job->status === 'completed' ? '#166534' : ($job && $job->status === 'failed' ? '#991b1b' : '#1f2937');
     $containerId = 'shared-queue-watcher-' . ($job->id ?? 'ajax-' . uniqid());
 
     $rawMessage = $job->message ?? 'Initializing import job...';
-    $customRenderer = config('shared-queue.markdown_renderer');
-    if ($customRenderer && is_callable($customRenderer)) {
-        $renderedMessage = $customRenderer($rawMessage);
-    } else {
-        $renderedMessage = e($rawMessage);
-    }
+    $renderedMessage = \Leafling\SharedQueue\Models\JobTracker::renderMessage($rawMessage);
 
-    $resolvedPollMin = (int) ($pollMin ?? $pollInterval ?? config('shared-queue.poll_min_interval', 2000));
+    $resolvedPollMin = (int) ($pollMin ?? ($pollInterval ?? config('shared-queue.poll_min_interval', 2000)));
     $resolvedPollMax = (int) ($pollMax ?? config('shared-queue.poll_max_interval', 15000));
     $resolvedAutoBackoff = filter_var($pollAutoBackoff ?? config('shared-queue.poll_auto_backoff', true), FILTER_VALIDATE_BOOLEAN);
 @endphp
@@ -43,18 +40,18 @@
     <div style="font-weight: 600; margin-bottom: 8px; color: {{ $labelColor }};">
         Import Status: <span class="progress-status-label">{{ ucfirst($job->status ?? 'Initializing') }}</span>
     </div>
-    
+
     <div class="progress-bar-wrapper" style="background: #e5e7eb; border-radius: 9999px; overflow: hidden; height: 16px; margin-bottom: 8px;">
         <div class="progress-bar-fill" style="width: {{ $percent }}%; background: {{ $barColor }}; height: 100%; transition: width 0.5s ease-in-out;"></div>
     </div>
-    
+
     <div class="progress-status-message" style="font-size: 0.875rem; color: #4b5563; margin-bottom: 12px;">
         {!! $renderedMessage !!}
     </div>
 
-    @if($steps)
+    @if ($steps)
         <div class="step-logs" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #eee; font-size: 0.75rem; color: #4b5563;">
-            @foreach($steps as $index => $stepLabel)
+            @foreach ($steps as $index => $stepLabel)
                 @php
                     $stepNumber = $index + 1;
                     $isCompleted = isset($stepDetails['step_' . $stepNumber]) || ($job && $job->status === 'completed');
@@ -64,7 +61,7 @@
                 <div class="log-step-row" style="display: flex; justify-content: space-between; margin-bottom: 6px; transition: opacity 0.3s; {{ $isCompleted ? 'color: #16a34a; font-weight: 600;' : ($isActive ? 'color: #2563eb; animation: shared-queue-pulse 2s infinite;' : 'opacity: 0.5;') }}">
                     <span>{{ $stepLabel }}</span>
                     <span class="log-duration" style="font-family: monospace;">
-                        @if($duration !== null)
+                        @if ($duration !== null)
                             Completed in {{ $duration }}s
                         @elseif($isCompleted)
                             Completed
@@ -78,7 +75,7 @@
             @endforeach
         </div>
     @endif
-    
+
     <script>
         (function() {
             const containerId = "{{ $containerId }}";
@@ -91,7 +88,7 @@
             const hasSteps = {{ $steps ? 'true' : 'false' }};
             const triggerSelector = "{{ $trigger }}";
             const endpointUrl = "{{ $endpoint }}";
-            
+
             const pollMinMs = {{ $resolvedPollMin }};
             const pollMaxMs = {{ $resolvedPollMax }};
             const enableAutoBackoff = {{ $resolvedAutoBackoff ? 'true' : 'false' }};
@@ -117,21 +114,28 @@
                     try {
                         const statusRoute = "{{ route('shared-queue.status', ':jobId') }}".replace(':jobId', jobId);
                         const response = await fetch(statusRoute + '?_t=' + Date.now(), {
-                            headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache' }
+                            headers: {
+                                'Accept': 'application/json',
+                                'Cache-Control': 'no-cache'
+                            }
                         });
-                        
+
                         if (response.ok) {
                             const data = await response.json();
-                            
+
                             let details = data.step_details || {};
                             if (typeof details === 'string') {
-                                try { details = JSON.parse(details); } catch(e) { details = {}; }
+                                try {
+                                    details = JSON.parse(details);
+                                } catch (e) {
+                                    details = {};
+                                }
                             }
-                            
+
                             const completedCount = Object.keys(details).length;
                             const totalSteps = data.total_steps || 1;
                             isDone = ['completed', 'failed'].includes(data.status);
-                            
+
                             // Check if progress or status changed
                             const stateChanged = (completedCount !== lastCompletedCount) || (data.status !== lastJobStatus);
                             if (stateChanged) {
@@ -142,7 +146,7 @@
                                 // Scale up delay by 1.5x up to max cap when unchanged
                                 currentPollDelay = Math.min(pollMaxMs, Math.round(currentPollDelay * 1.5));
                             }
-                            
+
                             // Progress calculation
                             let percent = 5;
                             if (isDone) {
@@ -157,12 +161,12 @@
                                 if (data.status === 'completed') fill.style.background = '#22c55e';
                                 else if (data.status === 'failed') fill.style.background = '#ef4444';
                             }
-                            
+
                             if (label) label.textContent = data.status.charAt(0).toUpperCase() + data.status.slice(1);
                             if (message && data.message) {
                                 message.innerHTML = parseMarkdown(data.message);
                             }
-                            
+
                             if (hasSteps) {
                                 const currentStep = data.current_step || 0;
                                 const rows = container.querySelectorAll('.log-step-row');
@@ -170,7 +174,7 @@
                                     const stepNum = idx + 1;
                                     const durationSpan = row.querySelector('.log-duration');
                                     const stepKey = 'step_' + stepNum;
-                                    
+
                                     if (details && details[stepKey] !== undefined) {
                                         row.style.color = '#16a34a';
                                         row.style.fontWeight = '600';
@@ -198,7 +202,7 @@
                                     }
                                 });
                             }
-                            
+
                             if (isDone) {
                                 if (activePollTimeout) clearTimeout(activePollTimeout);
                                 setTimeout(() => {
@@ -236,7 +240,7 @@
                         btn.addEventListener('click', async (e) => {
                             e.preventDefault();
                             btn.classList.add('disabled', 'opacity-50', 'pointer-events-none');
-                            
+
                             try {
                                 container.style.display = 'block';
                                 if (label) label.textContent = 'Starting...';
@@ -272,7 +276,7 @@
             }
 
             // If an active job was rendered server-side, start polling immediately
-            @if($job && in_array($job->status, ['pending', 'running']))
+            @if ($job && in_array($job->status, ['pending', 'running']))
                 startPolling({{ $job->id }});
             @endif
 

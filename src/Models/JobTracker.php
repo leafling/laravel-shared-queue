@@ -56,6 +56,22 @@ class JobTracker extends Model
         return static::$resolvedSiteCode = config('shared-queue.fallback_site_code', 'default');
     }
 
+    /**
+     * Render the given message using Str::markdown if available, falling back to e().
+     */
+    public static function renderMessage(?string $text): string
+    {
+        if ($text === null || $text === '') {
+            return '';
+        }
+
+        if (method_exists(\Illuminate\Support\Str::class, 'markdown')) {
+            return \Illuminate\Support\Str::markdown($text);
+        }
+
+        return e($text);
+    }
+
     protected static function booted(): void
     {
         // Auto-populate site_code and initiator on create

@@ -82,16 +82,6 @@ return [
     */
     'fallback_site_code' => env('SHARED_QUEUE_SITE_CODE_FALLBACK', 'default'),
 
-    /*
-    |--------------------------------------------------------------------------
-    | Markdown Renderer Callback
-    |--------------------------------------------------------------------------
-    |
-    | Optional custom Markdown rendering callback or class method for status
-    | messages. If null, messages are safely HTML-escaped by default.
-    |
-    */
-    'markdown_renderer' => null,
 
     /*
     |--------------------------------------------------------------------------
