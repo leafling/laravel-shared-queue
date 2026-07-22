@@ -92,4 +92,18 @@ return [
     |
     */
     'markdown_renderer' => null,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Watcher Polling Settings
+    |--------------------------------------------------------------------------
+    |
+    | Configuration options for the AJAX polling component <x-shared-queue-watcher>.
+    | Automatic backoff dynamically increases poll delay when status is unchanged,
+    | reducing server load on long-running tasks.
+    |
+    */
+    'poll_min_interval' => 2000,   // Minimum / initial poll delay in milliseconds
+    'poll_max_interval' => 15000,  // Maximum poll delay cap in milliseconds
+    'poll_auto_backoff' => true,   // Enable dynamic automatic exponential backoff
 ];

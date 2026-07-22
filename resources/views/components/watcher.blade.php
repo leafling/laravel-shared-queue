@@ -1,4 +1,13 @@
-@props(['job' => null, 'steps' => null, 'trigger' => null, 'endpoint' => null, 'pollInterval' => 2000])
+@props([
+    'job' => null, 
+    'steps' => null, 
+    'trigger' => null, 
+    'endpoint' => null, 
+    'pollInterval' => null,
+    'pollMin' => null,
+    'pollMax' => null,
+    'pollAutoBackoff' => null,
+])
 
 @php
     $isFinished = $job && in_array($job->status, ['completed', 'failed']);
@@ -24,6 +33,10 @@
     } else {
         $renderedMessage = e($rawMessage);
     }
+
+    $resolvedPollMin = (int) ($pollMin ?? $pollInterval ?? config('shared-queue.poll_min_interval', 2000));
+    $resolvedPollMax = (int) ($pollMax ?? config('shared-queue.poll_max_interval', 15000));
+    $resolvedAutoBackoff = filter_var($pollAutoBackoff ?? config('shared-queue.poll_auto_backoff', true), FILTER_VALIDATE_BOOLEAN);
 @endphp
 
 <div id="{{ $containerId }}" class="shared-queue-watcher-container" style="{{ $job ? 'display: block;' : 'display: none;' }} margin: 15px 0; padding: 15px; border: 1px solid #ddd; border-radius: 6px; background: #fafafa;">
@@ -79,8 +92,14 @@
             const triggerSelector = "{{ $trigger }}";
             const endpointUrl = "{{ $endpoint }}";
             
-            const pollIntervalMs = {{ (int) $pollInterval }};
-            let activePollInterval = null;
+            const pollMinMs = {{ $resolvedPollMin }};
+            const pollMaxMs = {{ $resolvedPollMax }};
+            const enableAutoBackoff = {{ $resolvedAutoBackoff ? 'true' : 'false' }};
+
+            let activePollTimeout = null;
+            let currentPollDelay = pollMinMs;
+            let lastCompletedCount = -1;
+            let lastJobStatus = null;
 
             function parseMarkdown(str) {
                 if (!str) return '';
@@ -90,99 +109,123 @@
                 return html;
             }
 
-            function startPolling(jobId) {
-                if (activePollInterval) clearInterval(activePollInterval);
-                
-                container.style.display = 'block';
+            function scheduleNextPoll(jobId) {
+                if (activePollTimeout) clearTimeout(activePollTimeout);
 
-                activePollInterval = setInterval(async () => {
+                activePollTimeout = setTimeout(async () => {
+                    let isDone = false;
                     try {
                         const statusRoute = "{{ route('shared-queue.status', ':jobId') }}".replace(':jobId', jobId);
                         const response = await fetch(statusRoute + '?_t=' + Date.now(), {
                             headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache' }
                         });
                         
-                        if (!response.ok) return;
-                        const data = await response.json();
-                        
-                        let details = data.step_details || {};
-                        if (typeof details === 'string') {
-                            try { details = JSON.parse(details); } catch(e) { details = {}; }
-                        }
-                        
-                        const completedCount = Object.keys(details).length;
-                        const totalSteps = data.total_steps || 1;
-                        const isDone = ['completed', 'failed'].includes(data.status);
-                        
-                        // Progress calculation: Based on COMPLETED steps + active in-flight fraction
-                        let percent = 5;
-                        if (isDone) {
-                            percent = 100;
-                        } else if (totalSteps > 0) {
-                            const completedPercent = (completedCount / totalSteps) * 100;
-                            // Add small active progress bump for current running step (capped at 95%)
-                            percent = Math.min(95, Math.max(5, Math.round(completedPercent + (100 / totalSteps * 0.25))));
-                        }
+                        if (response.ok) {
+                            const data = await response.json();
+                            
+                            let details = data.step_details || {};
+                            if (typeof details === 'string') {
+                                try { details = JSON.parse(details); } catch(e) { details = {}; }
+                            }
+                            
+                            const completedCount = Object.keys(details).length;
+                            const totalSteps = data.total_steps || 1;
+                            isDone = ['completed', 'failed'].includes(data.status);
+                            
+                            // Check if progress or status changed
+                            const stateChanged = (completedCount !== lastCompletedCount) || (data.status !== lastJobStatus);
+                            if (stateChanged) {
+                                lastCompletedCount = completedCount;
+                                lastJobStatus = data.status;
+                                currentPollDelay = pollMinMs; // Reset backoff to fast polling on progress change
+                            } else if (enableAutoBackoff) {
+                                // Scale up delay by 1.5x up to max cap when unchanged
+                                currentPollDelay = Math.min(pollMaxMs, Math.round(currentPollDelay * 1.5));
+                            }
+                            
+                            // Progress calculation
+                            let percent = 5;
+                            if (isDone) {
+                                percent = 100;
+                            } else if (totalSteps > 0) {
+                                const completedPercent = (completedCount / totalSteps) * 100;
+                                percent = Math.min(95, Math.max(5, Math.round(completedPercent + (100 / totalSteps * 0.25))));
+                            }
 
-                        if (fill) {
-                            fill.style.width = `${percent}%`;
-                            if (data.status === 'completed') fill.style.background = '#22c55e';
-                            else if (data.status === 'failed') fill.style.background = '#ef4444';
-                        }
-                        
-                        // Update status & message
-                        if (label) label.textContent = data.status.charAt(0).toUpperCase() + data.status.slice(1);
-                        if (message && data.message) {
-                            message.innerHTML = parseMarkdown(data.message);
-                        }
-                        
-                        // Update step rows
-                        if (hasSteps) {
-                            const currentStep = data.current_step || 0;
-                            const rows = container.querySelectorAll('.log-step-row');
-                            rows.forEach((row, idx) => {
-                                const stepNum = idx + 1;
-                                const durationSpan = row.querySelector('.log-duration');
-                                const stepKey = 'step_' + stepNum;
-                                
-                                if (details && details[stepKey] !== undefined) {
-                                    row.style.color = '#16a34a';
-                                    row.style.fontWeight = '600';
-                                    row.style.opacity = '1';
-                                    row.style.animation = 'none';
-                                    if (durationSpan) durationSpan.textContent = 'Completed in ' + details[stepKey] + 's';
-                                } else if (isDone || stepNum < currentStep) {
-                                    row.style.color = '#16a34a';
-                                    row.style.fontWeight = '600';
-                                    row.style.opacity = '1';
-                                    row.style.animation = 'none';
-                                    if (durationSpan) durationSpan.textContent = 'Completed';
-                                } else if (stepNum === currentStep && data.status === 'running') {
-                                    row.style.color = '#2563eb';
-                                    row.style.fontWeight = 'normal';
-                                    row.style.opacity = '1';
-                                    row.style.animation = 'shared-queue-pulse 2s infinite';
-                                    if (durationSpan) durationSpan.textContent = 'Running...';
-                                } else {
-                                    row.style.color = '';
-                                    row.style.fontWeight = 'normal';
-                                    row.style.opacity = '0.5';
-                                    row.style.animation = 'none';
-                                    if (durationSpan) durationSpan.textContent = 'Pending...';
-                                }
-                            });
-                        }
-                        
-                        if (isDone) {
-                            clearInterval(activePollInterval);
-                            setTimeout(() => {
-                                window.location.reload();
-                            }, 800);
+                            if (fill) {
+                                fill.style.width = `${percent}%`;
+                                if (data.status === 'completed') fill.style.background = '#22c55e';
+                                else if (data.status === 'failed') fill.style.background = '#ef4444';
+                            }
+                            
+                            if (label) label.textContent = data.status.charAt(0).toUpperCase() + data.status.slice(1);
+                            if (message && data.message) {
+                                message.innerHTML = parseMarkdown(data.message);
+                            }
+                            
+                            if (hasSteps) {
+                                const currentStep = data.current_step || 0;
+                                const rows = container.querySelectorAll('.log-step-row');
+                                rows.forEach((row, idx) => {
+                                    const stepNum = idx + 1;
+                                    const durationSpan = row.querySelector('.log-duration');
+                                    const stepKey = 'step_' + stepNum;
+                                    
+                                    if (details && details[stepKey] !== undefined) {
+                                        row.style.color = '#16a34a';
+                                        row.style.fontWeight = '600';
+                                        row.style.opacity = '1';
+                                        row.style.animation = 'none';
+                                        if (durationSpan) durationSpan.textContent = 'Completed in ' + details[stepKey] + 's';
+                                    } else if (isDone || stepNum < currentStep) {
+                                        row.style.color = '#16a34a';
+                                        row.style.fontWeight = '600';
+                                        row.style.opacity = '1';
+                                        row.style.animation = 'none';
+                                        if (durationSpan) durationSpan.textContent = 'Completed';
+                                    } else if (stepNum === currentStep && data.status === 'running') {
+                                        row.style.color = '#2563eb';
+                                        row.style.fontWeight = 'normal';
+                                        row.style.opacity = '1';
+                                        row.style.animation = 'shared-queue-pulse 2s infinite';
+                                        if (durationSpan) durationSpan.textContent = 'Running...';
+                                    } else {
+                                        row.style.color = '';
+                                        row.style.fontWeight = 'normal';
+                                        row.style.opacity = '0.5';
+                                        row.style.animation = 'none';
+                                        if (durationSpan) durationSpan.textContent = 'Pending...';
+                                    }
+                                });
+                            }
+                            
+                            if (isDone) {
+                                if (activePollTimeout) clearTimeout(activePollTimeout);
+                                setTimeout(() => {
+                                    window.location.reload();
+                                }, 800);
+                                return;
+                            }
                         }
                     } catch (e) {
                         console.error('Failed to poll shared queue job status:', e);
+                        if (enableAutoBackoff) {
+                            currentPollDelay = Math.min(pollMaxMs, currentPollDelay * 2);
+                        }
                     }
-                }, pollIntervalMs);
+
+                    if (!isDone) {
+                        scheduleNextPoll(jobId);
+                    }
+                }, currentPollDelay);
+            }
+
+            function startPolling(jobId) {
+                container.style.display = 'block';
+                currentPollDelay = pollMinMs;
+                lastCompletedCount = -1;
+                lastJobStatus = null;
+                scheduleNextPoll(jobId);
             }
 
             // Bind trigger click if selector and endpoint are provided
