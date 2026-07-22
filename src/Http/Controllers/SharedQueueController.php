@@ -26,6 +26,9 @@ class SharedQueueController extends Controller
      */
     public function status(JobTracker $job): JsonResponse
     {
+        // Force reading fresh data directly from the write connection to bypass read replica/cache lag
+        $job = JobTracker::onWriteConnection()->withoutGlobalScopes()->find($job->id) ?? $job;
+
         if (in_array($job->status, ['completed', 'failed'])) {
             if ($job->status === 'completed') {
                 session()->flash('message', $job->message);
@@ -41,7 +44,7 @@ class SharedQueueController extends Controller
             'total_steps' => $job->total_steps,
             'message' => $job->message,
             'step_details' => $job->step_details,
-            'updated_at' => $job->updated_at->toIso8601String(),
+            'updated_at' => $job->updated_at?->toIso8601String(),
         ]);
     }
 
@@ -50,6 +53,8 @@ class SharedQueueController extends Controller
      */
     public function reset(JobTracker $job): RedirectResponse
     {
+        $job = JobTracker::onWriteConnection()->withoutGlobalScopes()->find($job->id) ?? $job;
+
         if (in_array($job->status, ['pending', 'running'])) {
             $job->update([
                 'status' => 'failed',
