@@ -2,7 +2,6 @@
 
 namespace Leafling\SharedQueue\Http\Controllers;
 
-use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Leafling\SharedQueue\Models\JobTracker;
 use Illuminate\Contracts\View\View;
@@ -26,8 +25,7 @@ class SharedQueueController extends Controller
      */
     public function status(JobTracker $job): JsonResponse
     {
-        // Force reading fresh data directly from the write connection to bypass read replica/cache lag
-        $job = JobTracker::onWriteConnection()->withoutGlobalScopes()->find($job->id) ?? $job;
+        $job->refresh();
 
         if (in_array($job->status, ['completed', 'failed'])) {
             if ($job->status === 'completed') {
@@ -54,7 +52,6 @@ class SharedQueueController extends Controller
      */
     public function reset(JobTracker $job): RedirectResponse
     {
-        $job = JobTracker::onWriteConnection()->withoutGlobalScopes()->find($job->id) ?? $job;
 
         if (in_array($job->status, ['pending', 'running'])) {
             $job->update([
