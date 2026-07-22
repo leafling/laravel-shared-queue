@@ -89,8 +89,8 @@
                 activePollInterval = setInterval(async () => {
                     try {
                         const statusRoute = "{{ route('shared-queue.status', ':jobId') }}".replace(':jobId', jobId);
-                        const response = await fetch(statusRoute, {
-                            headers: { 'Accept': 'application/json' }
+                        const response = await fetch(statusRoute + '?_t=' + Date.now(), {
+                            headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache' }
                         });
                         
                         if (!response.ok) return;

@@ -45,7 +45,8 @@ class SharedQueueController extends Controller
             'message' => $job->message,
             'step_details' => $job->step_details,
             'updated_at' => $job->updated_at?->toIso8601String(),
-        ]);
+        ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+          ->header('Pragma', 'no-cache');
     }
 
     /**
