@@ -62,6 +62,13 @@
         .sq-btn-reset:hover {
             background: #dc2626;
         }
+
+        .shared-queue-table-wrapper nav svg {
+            width: 1.25rem;
+            height: 1.25rem;
+            display: inline-block;
+            vertical-align: middle;
+        }
     </style>
 
     @if (session('message'))
